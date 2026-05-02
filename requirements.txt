@@ -1,0 +1,12 @@
+langgraph
+langchain-openai
+langchain-core
+openai
+fastapi
+uvicorn
+supabase
+python-dotenv
+httpx
+dnspython
+pytest
+pytest-asyncio

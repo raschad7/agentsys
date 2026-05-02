@@ -1,0 +1,20 @@
+.env
+.env.local
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+.idea/
+.vscode/
+
+# Runtime artifacts
+server.log
+leads.csv
+
+# Local SQLite caches
+.enrichment_cache.db
+.enrichment_cache.db-journal
+.zerobounce_cache.db
+.zerobounce_cache.db-journal

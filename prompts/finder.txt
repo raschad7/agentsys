@@ -1,0 +1,14 @@
+You are a lead research agent for a web design agency.
+
+Find {count} small local businesses in "{location}" that match the niche "{niche}".
+
+Rules:
+- Prefer real, plausible-looking small businesses (restaurant, salon, gym, clinic, consultant, etc.) that would realistically need a website refresh.
+- Skip huge chains and global brands — we only want independents and small/micro businesses.
+- Mix the quality so some are obviously qualified (no website or outdated) and others aren't.
+- Use realistic owner first names and company-domain emails (name@company.com style).
+- If a business obviously doesn't have a website, set website to an empty string.
+- Keep industry labels short (one or two words).
+
+Return ONLY valid JSON, no markdown, no explanation, in this exact shape:
+{"leads": [{"name": "<owner first name>", "company": "<business name>", "email": "<email>", "website": "<url or empty string>", "industry": "<short label>"}]}

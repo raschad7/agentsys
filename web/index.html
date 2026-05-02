@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>AgentFlow Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #14181d;
+    --panel-2: #1b2026;
+    --border: #262d35;
+    --text: #e6edf3;
+    --muted: #8b949e;
+    --accent: #5eead4;
+    --accent-2: #818cf8;
+    --good: #4ade80;
+    --bad: #f87171;
+    --warn: #fbbf24;
+    --purple: #c084fc;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    min-height: 100vh;
+  }
+  header {
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    background: var(--panel);
+  }
+  header h1 {
+    margin: 0; font-size: 17px; letter-spacing: 0.3px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  header h1 .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent); box-shadow: 0 0 12px var(--accent);
+  }
+  header .badge {
+    font-size: 11px; color: var(--muted);
+    padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px;
+  }
+
+  /* Search bar */
+  .search-bar {
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding: 18px 28px;
+    display: grid;
+    grid-template-columns: 1.5fr 1.5fr 0.7fr auto;
+    gap: 12px;
+    align-items: end;
+  }
+  .search-bar .field { display: flex; flex-direction: column; gap: 5px; }
+  .search-bar label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .search-bar input {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 10px 12px; border-radius: 8px;
+    font-size: 14px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .search-bar input:focus { border-color: var(--accent); }
+  .go-btn {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    color: #0b0d10; font-weight: 600;
+    border: none; padding: 10px 24px;
+    border-radius: 8px; cursor: pointer; font-size: 14px;
+    transition: transform 0.1s, box-shadow 0.15s;
+    height: 38px;
+  }
+  .go-btn:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(94,234,212,0.2); }
+  .go-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .preset-row {
+    padding: 10px 28px 0;
+    display: flex; gap: 8px; flex-wrap: wrap;
+    background: var(--panel);
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+  }
+  .preset {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 11px;
+    padding: 5px 11px; border-radius: 999px; cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .preset:hover { color: var(--text); border-color: var(--accent); }
+
+  /* Pipeline overview (4 nodes now: Finder · Enricher · Scorer · Outreach) */
+  .pipeline {
+    margin: 24px 28px 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px 24px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 0; flex-wrap: wrap;
+  }
+  .node {
+    flex: 0 0 180px;
+    background: var(--panel-2);
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px;
+    display: flex; flex-direction: column; gap: 6px;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .node .role { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .node .title { font-weight: 600; font-size: 14px; }
+  .node .status { font-size: 11px; color: var(--muted); min-height: 14px; }
+  .node .pulse {
+    position: absolute; top: 12px; right: 12px;
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--border);
+  }
+  .node.idle { border-color: var(--border); }
+  .node.running {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 4px rgba(94,234,212,0.08), 0 0 24px rgba(94,234,212,0.15);
+  }
+  .node.running .pulse {
+    background: var(--accent);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  .node.done { border-color: var(--good); }
+  .node.done .pulse { background: var(--good); }
+  .node.manual { border-color: var(--purple); }
+  .node.manual .pulse { background: var(--purple); }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(94,234,212,0.7); }
+    50% { box-shadow: 0 0 0 10px rgba(94,234,212,0); }
+  }
+  .arrow {
+    flex: 0 0 36px; height: 2px;
+    background: var(--border);
+    position: relative;
+    transition: background 0.25s;
+  }
+  .arrow::after {
+    content: "";
+    position: absolute; right: -1px; top: -4px;
+    border: 5px solid transparent;
+    border-left-color: var(--border);
+    transition: border-left-color 0.25s;
+  }
+  .arrow.active { background: var(--accent); }
+  .arrow.active::after { border-left-color: var(--accent); }
+  .arrow.manual-arrow { background: var(--purple); opacity: 0.6; }
+  .arrow.manual-arrow::after { border-left-color: var(--purple); }
+
+  /* Summary strip */
+  .summary {
+    margin: 16px 28px 0;
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 12px;
+  }
+  .summary .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 3px;
+  }
+  .summary .stat .label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .summary .stat .value { font-size: 20px; font-weight: 600; }
+  .summary .stat.qual .value { color: var(--good); }
+  .summary .stat.draft .value { color: var(--purple); }
+  .summary .stat.sent .value { color: var(--accent); }
+  .summary .stat.dm   .value { color: var(--warn); }
+  .summary .stat.rej  .value { color: var(--bad); }
+  .summary .stat.err  .value { color: var(--warn); }
+
+  /* Bulk action bar */
+  .bulkbar {
+    margin: 16px 28px 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .bulkbar .label {
+    font-size: 11px; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 1px; margin-right: auto;
+  }
+  .bulk-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 7px 12px; border-radius: 8px;
+    font-size: 12px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+  }
+  .bulk-btn:hover { border-color: var(--purple); background: rgba(192,132,252,0.08); }
+  .bulk-btn.send:hover { border-color: var(--accent); background: rgba(94,234,212,0.08); }
+
+  /* Main: grid + log */
+  main {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 20px;
+    padding: 20px 28px 28px;
+  }
+  .grid-panel, .log-panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex; flex-direction: column; gap: 12px;
+    min-height: 500px;
+  }
+  .grid-panel h3, .log-panel h3 {
+    margin: 0; font-size: 11px; text-transform: uppercase;
+    color: var(--muted); letter-spacing: 1.2px;
+  }
+
+  .lead-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 12px;
+    align-content: start;
+  }
+  .empty-msg {
+    padding: 40px 16px;
+    text-align: center; color: var(--muted); font-size: 13px;
+  }
+
+  /* Lead card */
+  .card {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-left-width: 3px;
+    border-radius: 10px;
+    padding: 12px 14px;
+    display: flex; flex-direction: column; gap: 8px;
+    transition: all 0.25s;
+    position: relative;
+  }
+  .card.searching { border-left-color: var(--muted); }
+  .card.scoring   { border-left-color: var(--accent); animation: cardPulse 1.5s ease-in-out infinite; }
+  .card.enriching { border-left-color: var(--warn); animation: cardPulse 1.5s ease-in-out infinite; }
+  .card.qualified { border-left-color: var(--good); }
+  .card.drafting  { border-left-color: var(--purple); animation: cardPulse 1.5s ease-in-out infinite; }
+  .card.drafted   { border-left-color: var(--purple); }
+  .card.sending   { border-left-color: var(--accent); animation: cardPulse 1.5s ease-in-out infinite; }
+  .card.contacted { border-left-color: var(--good); }
+  .card.rejected  { border-left-color: var(--bad); opacity: 0.8; }
+  .card.error     { border-left-color: var(--warn); }
+  .card.no_contact_email { border-left-color: var(--warn); }
+  @keyframes cardPulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(94,234,212,0.0); }
+    50% { box-shadow: 0 0 0 3px rgba(94,234,212,0.12); }
+  }
+  .card-head { display: flex; justify-content: space-between; align-items: start; gap: 8px; }
+  .card-name { font-weight: 600; font-size: 14px; min-width: 0; flex: 1; word-break: break-word; }
+  .card-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
+  .card-score {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 12px; font-weight: 600;
+    padding: 2px 8px; border-radius: 999px;
+    background: var(--panel); color: var(--muted);
+    flex-shrink: 0;
+  }
+  .card-score.s5, .card-score.s4 { color: var(--good); background: rgba(74,222,128,0.12); }
+  .card-score.s3 { color: var(--accent); background: rgba(94,234,212,0.12); }
+  .card-score.s2, .card-score.s1, .card-score.s0 { color: var(--bad); background: rgba(248,113,113,0.12); }
+
+  /* Channel chips */
+  .card-channels { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    font-size: 10px; padding: 2px 8px; border-radius: 999px;
+    background: var(--panel); border: 1px solid var(--border);
+    color: var(--text); text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .chip:hover { border-color: var(--accent); color: var(--accent); }
+  .chip.ig    { color: #f0a; border-color: rgba(255,0,170,0.3); }
+  .chip.fb    { color: #4f7cff; border-color: rgba(79,124,255,0.3); }
+  .chip.web   { color: var(--accent); border-color: rgba(94,234,212,0.3); }
+  .chip.phone { color: var(--muted); }
+  .chip.dm    { color: var(--warn); border-color: rgba(251,191,36,0.4); background: rgba(251,191,36,0.08); }
+
+  /* Signals row (Tier 2) */
+  .card-signals { display: flex; flex-wrap: wrap; gap: 4px; }
+  .signal {
+    font-size: 10px; padding: 1px 6px; border-radius: 4px;
+    background: rgba(255,255,255,0.04); border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .signal.good { color: var(--good); border-color: rgba(74,222,128,0.3); }
+  .signal.warn { color: var(--warn); border-color: rgba(251,191,36,0.3); }
+  .signal.bad  { color: var(--bad);  border-color: rgba(248,113,113,0.3); }
+
+  .card-status {
+    font-size: 11px; color: var(--muted); display: flex; align-items: center; gap: 6px;
+  }
+  .card-status .spin {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  .card-reasoning { font-size: 11px; color: var(--muted); font-style: italic; line-height: 1.4; }
+
+  /* Draft email box */
+  .card-email {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: none; flex-direction: column; gap: 6px;
+  }
+  .card-email.visible { display: flex; }
+  .card-email .subj { font-weight: 600; color: var(--text); font-size: 12px; }
+  .card-email .body { color: var(--muted); white-space: pre-wrap; line-height: 1.5; font-size: 11px; }
+  .card-email .edit-subj {
+    display: none;
+    background: var(--panel-2); border: 1px solid var(--accent); color: var(--text);
+    padding: 4px 8px; border-radius: 4px; font-size: 12px; outline: none;
+  }
+  .card-email .edit-body {
+    display: none; min-height: 100px; resize: vertical;
+    background: var(--panel-2); border: 1px solid var(--accent); color: var(--text);
+    padding: 6px 8px; border-radius: 4px; font-size: 11px; outline: none;
+    font-family: inherit; line-height: 1.5;
+  }
+  .card-email.editing .subj, .card-email.editing .body { display: none; }
+  .card-email.editing .edit-subj, .card-email.editing .edit-body { display: block; }
+
+  /* Per-card action buttons */
+  .card-actions {
+    display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end;
+  }
+  .act-btn {
+    font-size: 11px; padding: 5px 10px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--panel);
+    color: var(--text); cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .act-btn:hover { background: rgba(255,255,255,0.04); }
+  .act-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .act-btn.draft  { border-color: var(--purple); color: var(--purple); }
+  .act-btn.draft:hover  { background: rgba(192,132,252,0.1); }
+  .act-btn.send   { border-color: var(--accent); color: var(--accent); }
+  .act-btn.send:hover   { background: rgba(94,234,212,0.1); }
+  .act-btn.reject { border-color: var(--bad); color: var(--bad); }
+  .act-btn.reject:hover { background: rgba(248,113,113,0.1); }
+  .act-btn.edit   { color: var(--muted); }
+
+  /* Live log */
+  .log-stream {
+    flex: 1; overflow-y: auto;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 11px; line-height: 1.5;
+    max-height: 600px;
+  }
+  .log-line { padding: 2px 0; display: flex; gap: 8px; }
+  .log-line .ts { color: var(--muted); flex: 0 0 60px; font-size: 10px; padding-top: 1px; }
+  .log-line .tag { flex: 0 0 78px; font-weight: 600; font-size: 10px; padding-top: 1px; }
+  .log-line .msg { flex: 1; color: var(--text); word-break: break-word; }
+  .log-line.finder   .tag { color: var(--warn); }
+  .log-line.enricher .tag { color: var(--warn); }
+  .log-line.scorer   .tag { color: var(--accent); }
+  .log-line.scribe   .tag { color: var(--purple); }
+  .log-line.postie   .tag { color: var(--accent-2); }
+  .log-line.system   .tag { color: var(--muted); }
+  .log-line.error    .tag { color: var(--bad); }
+  .log-line.error    .msg { color: var(--bad); }
+  .log-line.success  .tag { color: var(--good); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span class="dot"></span>AgentFlow</h1>
+  <span class="badge">Find · Enrich · Qualify · Reach (manual)</span>
+</header>
+
+<!-- Search bar -->
+<div class="search-bar" style="grid-template-columns: 1.4fr 1.4fr 0.7fr 1.2fr auto;">
+  <div class="field">
+    <label>Location</label>
+    <input id="f-location" placeholder="Ramallah, Palestine" />
+  </div>
+  <div class="field">
+    <label>Niche</label>
+    <input id="f-niche" placeholder="cafe, restaurant, dentist…" />
+  </div>
+  <div class="field">
+    <label>How many?</label>
+    <input id="f-count" type="number" min="1" max="20" value="5" />
+  </div>
+  <div class="field">
+    <label style="display:flex; justify-content:space-between; align-items:center;">
+      <span>Campaign</span>
+      <a href="#" id="campaign-new" style="font-size:10px; color:var(--purple); text-decoration:none;">+ new</a>
+    </label>
+    <select id="f-campaign" style="
+      background: var(--panel-2); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 12px; border-radius: 8px;
+      font-size: 14px; outline: none; height: 38px;">
+      <option value="">— default rubric —</option>
+    </select>
+  </div>
+  <button id="go-btn" class="go-btn">Go</button>
+</div>
+
+<!-- B11 — campaign create modal -->
+<div id="campaign-modal" style="
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7);
+  z-index:1000; align-items:center; justify-content:center;">
+  <div style="
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px; width: min(540px, 92vw);
+    display:flex; flex-direction:column; gap: 12px;">
+    <h3 style="margin:0; font-size:14px; color:var(--text);">New campaign</h3>
+    <p style="margin:0; font-size:11px; color:var(--muted); line-height:1.5;">
+      Bundles an ICP description + pitch angle + score threshold. The Scribe injects
+      these into outreach prompts so emails sound right for this audience.
+    </p>
+    <div class="field"><label>Name *</label>
+      <input id="cm-name" placeholder="e.g. Web design for MENA cafés" /></div>
+    <div class="field"><label>ICP description (optional)</label>
+      <textarea id="cm-desc" rows="3" placeholder="Small cafés in MENA cities with active IG but no website…"
+        style="background:var(--panel-2); border:1px solid var(--border); color:var(--text); padding:8px; border-radius:8px; font-size:13px; outline:none; font-family:inherit; resize:vertical;"></textarea></div>
+    <div class="field"><label>Pitch angle (optional, one line)</label>
+      <input id="cm-angle" placeholder="e.g. We turn IG followers into paying online orders" /></div>
+    <div class="field"><label>Score threshold (0-5)</label>
+      <input id="cm-threshold" type="number" min="0" max="5" value="3" /></div>
+    <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:6px;">
+      <button id="cm-cancel" class="bulk-btn">Cancel</button>
+      <button id="cm-create" class="go-btn" style="height:36px;">Create</button>
+    </div>
+  </div>
+</div>
+
+<div class="preset-row">
+  <span class="preset" data-loc="Ramallah, Palestine" data-niche="cafe" data-count="6">Cafés · Ramallah</span>
+  <span class="preset" data-loc="Bethlehem, Palestine" data-niche="restaurant" data-count="6">Restaurants · Bethlehem</span>
+  <span class="preset" data-loc="Brooklyn, NY" data-niche="bakery" data-count="5">Bakeries · Brooklyn</span>
+  <span class="preset" data-loc="Austin, TX" data-niche="dentist" data-count="5">Dentists · Austin</span>
+  <span class="preset" data-loc="Berlin, DE" data-niche="coffee shop" data-count="6">Coffee shops · Berlin</span>
+</div>
+
+<!-- Pipeline visualization: 3 auto + 1 manual -->
+<div class="pipeline">
+  <div class="node idle" id="node-finder">
+    <div class="role">Auto · gpt-4o-mini</div>
+    <div class="title">Lead Finder</div>
+    <div class="status" id="status-finder">idle</div>
+    <div class="pulse"></div>
+  </div>
+  <div class="arrow" id="arrow-1"></div>
+  <div class="node idle" id="node-enricher">
+    <div class="role">Auto · web scrape</div>
+    <div class="title">Enricher</div>
+    <div class="status" id="status-enricher">idle</div>
+    <div class="pulse"></div>
+  </div>
+  <div class="arrow" id="arrow-2"></div>
+  <div class="node idle" id="node-scorer">
+    <div class="role">Auto · rules + LLM</div>
+    <div class="title">Scorer</div>
+    <div class="status" id="status-scorer">idle</div>
+    <div class="pulse"></div>
+  </div>
+  <div class="arrow manual-arrow" id="arrow-3"></div>
+  <div class="node manual" id="node-outreach">
+    <div class="role">Manual · per lead</div>
+    <div class="title">Outreach</div>
+    <div class="status" id="status-outreach">awaiting your click</div>
+    <div class="pulse"></div>
+  </div>
+</div>
+
+<!-- Summary -->
+<div class="summary">
+  <div class="stat"><span class="label">Found</span><span class="value" id="s-found">0</span></div>
+  <div class="stat qual"><span class="label">Qualified</span><span class="value" id="s-qualified">0</span></div>
+  <div class="stat draft"><span class="label">Drafted</span><span class="value" id="s-drafted">0</span></div>
+  <div class="stat sent"><span class="label">Sent</span><span class="value" id="s-sent">0</span></div>
+  <div class="stat dm"><span class="label">Needs DM</span><span class="value" id="s-needsdm">0</span></div>
+  <div class="stat rej"><span class="label">Rejected</span><span class="value" id="s-rejected">0</span></div>
+  <div class="stat err"><span class="label">Errors</span><span class="value" id="s-errors">0</span></div>
+</div>
+
+<!-- Bulk action bar -->
+<div class="bulkbar">
+  <span class="label">Bulk actions</span>
+  <button class="bulk-btn" id="bulk-draft">✍ Draft all qualified</button>
+  <button class="bulk-btn send" id="bulk-send">📮 Send all drafts</button>
+</div>
+
+<main>
+  <div class="grid-panel">
+    <h3>Leads</h3>
+    <div class="lead-grid" id="lead-grid">
+      <div class="empty-msg" id="empty-msg">Run a search to find leads.</div>
+    </div>
+  </div>
+  <div class="log-panel">
+    <h3>Live Activity</h3>
+    <div class="log-stream" id="log-stream"></div>
+  </div>
+</main>
+
+<!-- B12 — operational stats footer -->
+<footer id="ops-footer" style="
+  padding: 10px 28px; margin: 0 28px 24px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+  display: flex; gap: 24px; flex-wrap: wrap; align-items: center;
+  font-size: 11px; color: var(--muted);">
+  <span><span style="color:var(--accent)">⚙</span> Today's OpenAI spend:
+        <span id="ops-spend" style="color: var(--text); font-family: ui-monospace, monospace;">$0.0000</span>
+        <span id="ops-cap"></span></span>
+  <span>Leads in DB: <span id="ops-leads-total" style="color: var(--text)">0</span></span>
+  <span id="ops-leads-status" style="font-family: ui-monospace, monospace;"></span>
+  <span id="ops-leads-source" style="font-family: ui-monospace, monospace;"></span>
+  <span style="margin-left: auto;">Enrichment cache:
+        <span id="ops-cache" style="color: var(--text)">—</span></span>
+</footer>
+
+<script>
+const $ = id => document.getElementById(id);
+
+/* ---------------- API auth (Tier-A1) ---------------- */
+/* Server injects <meta name="agentflow-api-key" content="..."> into <head>.
+   We pull it once and attach to every /api/ + /import fetch.
+   For SSE (EventSource), the key rides as a query param since EventSource
+   doesn't support custom headers. */
+const API_KEY = (() => {
+  const m = document.querySelector('meta[name="agentflow-api-key"]');
+  return m ? m.getAttribute("content") || "" : "";
+})();
+const _origFetch = window.fetch.bind(window);
+window.fetch = function(input, init) {
+  const url = typeof input === "string" ? input : (input && input.url) || "";
+  if (API_KEY && (url.startsWith("/api/") || url.startsWith("/import"))) {
+    init = init || {};
+    init.headers = new Headers(init.headers || {});
+    init.headers.set("X-API-Key", API_KEY);
+  }
+  return _origFetch(input, init);
+};
+
+/* ---------------- Presets ---------------- */
+document.querySelectorAll(".preset").forEach(el => {
+  el.addEventListener("click", () => {
+    $("f-location").value = el.dataset.loc;
+    $("f-niche").value = el.dataset.niche;
+    $("f-count").value = el.dataset.count;
+  });
+});
+
+/* ---------------- Helpers ---------------- */
+function setNode(id, state, text) {
+  const node = $(`node-${id}`);
+  if (!node) return;
+  node.classList.remove("idle","running","done","manual");
+  node.classList.add(state);
+  if (text !== undefined) $(`status-${id}`).textContent = text;
+}
+function setArrow(id, on) {
+  const a = $(`arrow-${id}`);
+  if (!a) return;
+  a.classList.toggle("active", !!on);
+}
+function logLine(tag, msg, klass) {
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement("div");
+  div.className = `log-line ${klass || tag}`;
+  div.innerHTML = `<span class="ts">${ts}</span><span class="tag">[${tag}]</span><span class="msg"></span>`;
+  div.querySelector(".msg").textContent = msg;
+  const log = $("log-stream");
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+/* ---------------- State ---------------- */
+let cards = {};
+let summary = { found: 0, qualified: 0, drafted: 0, sent: 0, needsdm: 0, rejected: 0, errors: 0 };
+let currentSource = null;
+
+function refreshSummary() {
+  $("s-found").textContent = summary.found;
+  $("s-qualified").textContent = summary.qualified;
+  $("s-drafted").textContent = summary.drafted;
+  $("s-sent").textContent = summary.sent;
+  $("s-needsdm").textContent = summary.needsdm;
+  $("s-rejected").textContent = summary.rejected;
+  $("s-errors").textContent = summary.errors;
+}
+
+function resetUI() {
+  ["finder","enricher","scorer"].forEach(n => setNode(n, "idle", "idle"));
+  setNode("outreach", "manual", "awaiting your click");
+  [1,2,3].forEach(i => setArrow(i, false));
+  $("lead-grid").innerHTML = '<div class="empty-msg">Searching…</div>';
+  $("log-stream").innerHTML = "";
+  cards = {};
+  summary = { found: 0, qualified: 0, drafted: 0, sent: 0, needsdm: 0, rejected: 0, errors: 0 };
+  refreshSummary();
+}
+
+function channelChips(lead) {
+  const c = [];
+  if (lead.email)   c.push(`<span class="chip" title="${lead.email}">✉ ${lead.email}</span>`);
+  if (lead.website) {
+    const safe = lead.website.startsWith("http") ? lead.website : "http://" + lead.website;
+    c.push(`<a class="chip web" href="${safe}" target="_blank" rel="noopener">🌐 site</a>`);
+  }
+  if (lead.instagram) c.push(`<a class="chip ig" href="https://instagram.com/${lead.instagram}" target="_blank" rel="noopener">IG @${lead.instagram}</a>`);
+  if (lead.facebook) {
+    const fb = lead.facebook.startsWith("http") ? lead.facebook : "https://facebook.com/" + lead.facebook;
+    c.push(`<a class="chip fb" href="${fb}" target="_blank" rel="noopener">FB</a>`);
+  }
+  if (lead.phone) c.push(`<span class="chip phone">📞 ${lead.phone}</span>`);
+  if (!lead.email) c.push(`<span class="chip dm">needs DM</span>`);
+  return c.join("");
+}
+
+/* Map raw signal keys to color-coded badges shown on the card. */
+const SIGNAL_RENDER = {
+  no_website:           { text: "no website",      cls: "good" },   // good for us, they need help
+  website_dead:         { text: "site down",       cls: "good" },
+  slow_site:            { text: "slow site",       cls: "warn" },
+  outdated_tech:        { text: "outdated tech",   cls: "warn" },
+  no_mobile_viewport:   { text: "not mobile",      cls: "warn" },
+  no_https:             { text: "no https",        cls: "warn" },
+  has_contact_form:     { text: "contact form",    cls: "" },
+  active_social:        { text: "active social",   cls: "good" },
+  modern_site:          { text: "modern site",     cls: "bad" },    // bad for us — they don't need a redesign
+  // A2 reliability layer
+  business_closed:      { text: "✗ closed",        cls: "bad" },    // kill-switch: rejected immediately
+  parked_domain:        { text: "✗ parked domain", cls: "bad" },    // kill-switch: rejected immediately
+  business_stale:       { text: "stale (©old)",    cls: "warn" },   // footer year out of date
+  social_silent:        { text: "social silent",   cls: "warn" },   // IG/FB inactive >180d
+};
+function signalChips(signals) {
+  if (!signals) return "";
+  return Object.keys(signals)
+    .filter(k => signals[k] && SIGNAL_RENDER[k])
+    .map(k => `<span class="signal ${SIGNAL_RENDER[k].cls}">${SIGNAL_RENDER[k].text}</span>`)
+    .join("");
+}
+
+/* ---------------- Card ---------------- */
+function makeCard(index, lead) {
+  const card = document.createElement("div");
+  card.className = "card searching";
+  card.dataset.index = index;
+  card.dataset.leadId = lead.id || "";
+  card.innerHTML = `
+    <div class="card-head">
+      <div style="min-width:0; flex:1;">
+        <div class="card-name"></div>
+        <div class="card-meta"></div>
+      </div>
+      <div class="card-score">—</div>
+    </div>
+    <div class="card-channels"></div>
+    <div class="card-signals"></div>
+    <div class="card-status"><span class="spin"></span><span class="status-text">queued</span></div>
+    <div class="card-reasoning"></div>
+    <div class="card-email">
+      <div class="subj"></div>
+      <div class="body"></div>
+      <input class="edit-subj" placeholder="Subject" />
+      <textarea class="edit-body" placeholder="Body"></textarea>
+    </div>
+    <div class="card-actions"></div>
+  `;
+  card.querySelector(".card-name").textContent = lead.company || lead.name || "Lead " + (index+1);
+  card.querySelector(".card-meta").textContent = lead.industry || "";
+  card.querySelector(".card-channels").innerHTML = channelChips(lead);
+  return card;
+}
+
+function setCardStatus(index, klass, text) {
+  const c = cards[index]; if (!c) return;
+  c.el.className = "card " + klass;
+  if (text !== undefined) c.el.querySelector(".status-text").textContent = text;
+  const terminal = ["qualified","drafted","contacted","rejected","error","no_contact_email"];
+  const spin = c.el.querySelector(".spin");
+  if (spin) spin.style.display = terminal.includes(klass) ? "none" : "inline-block";
+  c.status = klass;
+  renderActions(index);
+}
+
+function renderActions(index) {
+  const c = cards[index]; if (!c) return;
+  const id = c.lead.id;
+  const status = c.status;
+  let html = "";
+  if (status === "qualified") {
+    html += `<button class="act-btn draft" onclick="draftLead('${id}',${index})">✍ Draft email</button>`;
+    html += `<button class="act-btn reject" onclick="rejectLead('${id}',${index})">✗ Reject</button>`;
+  } else if (status === "drafted") {
+    if (!c.editing) {
+      html += `<button class="act-btn send" onclick="sendLead('${id}',${index})">📮 Send</button>`;
+      html += `<button class="act-btn edit" onclick="toggleEdit(${index},true)">✎ Edit</button>`;
+      html += `<button class="act-btn draft" onclick="draftLead('${id}',${index})">↻ Re-draft</button>`;
+      html += `<button class="act-btn reject" onclick="rejectLead('${id}',${index})">✗ Reject</button>`;
+    } else {
+      html += `<button class="act-btn send" onclick="saveEdit('${id}',${index})">💾 Save</button>`;
+      html += `<button class="act-btn edit" onclick="toggleEdit(${index},false)">cancel</button>`;
+    }
+  } else if (status === "contacted") {
+    html += `<span style="font-size:11px;color:var(--good)">✓ sent</span>`;
+  } else if (status === "rejected") {
+    html += `<span style="font-size:11px;color:var(--bad)">✗ rejected</span>`;
+    html += `<button class="act-btn edit" onclick="dismissCard(${index})">⨯ Hide</button>`;
+  } else if (status === "no_contact_email") {
+    if (id) html += `<button class="act-btn reject" onclick="rejectLead('${id}',${index})">✗ Discard</button>`;
+    else    html += `<button class="act-btn edit"   onclick="dismissCard(${index})">⨯ Dismiss</button>`;
+  } else if (status === "error") {
+    // No lead_id = insert never succeeded → only client-side dismiss.
+    if (id) {
+      html += `<button class="act-btn draft"  onclick="draftLead('${id}',${index})">↻ Retry draft</button>`;
+      html += `<button class="act-btn reject" onclick="rejectLead('${id}',${index})">✗ Reject</button>`;
+    } else {
+      html += `<button class="act-btn edit"   onclick="dismissCard(${index})">⨯ Dismiss</button>`;
+    }
+  }
+  c.el.querySelector(".card-actions").innerHTML = html;
+}
+
+function dismissCard(index) {
+  const c = cards[index]; if (!c) return;
+  c.el.remove();
+  delete cards[index];
+}
+
+function showDraft(index, subject, body) {
+  const c = cards[index]; if (!c) return;
+  const box = c.el.querySelector(".card-email");
+  box.classList.add("visible");
+  box.querySelector(".subj").textContent = subject || "";
+  box.querySelector(".body").textContent = body || "";
+  box.querySelector(".edit-subj").value = subject || "";
+  box.querySelector(".edit-body").value = body || "";
+}
+
+function showSignals(index, signals) {
+  const c = cards[index]; if (!c) return;
+  c.el.querySelector(".card-signals").innerHTML = signalChips(signals);
+}
+
+/* ---------------- Manual actions ---------------- */
+async function draftLead(id, index) {
+  const c = cards[index]; if (!c) return;
+  setCardStatus(index, "drafting", "Scribe is drafting…");
+  setNode("outreach", "running", "drafting…");
+  logLine("scribe", `Drafting for ${c.lead.company || id}`, "scribe");
+  try {
+    const r = await fetch("/api/draft/" + id, { method: "POST" });
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.detail || "draft failed");
+    showDraft(index, data.subject, data.body);
+    if (c.previousStatus !== "drafted") {
+      summary.qualified = Math.max(0, summary.qualified - 1);
+      summary.drafted += 1;
+    }
+    c.previousStatus = "drafted";
+    refreshSummary();
+    setCardStatus(index, "drafted", "draft ready · review and send");
+    setNode("outreach", "manual", "awaiting your click");
+    logLine("scribe", `Subject: ${data.subject}`, "scribe");
+  } catch (e) {
+    setCardStatus(index, "error", "draft failed: " + e.message);
+    summary.errors += 1; refreshSummary();
+    setNode("outreach", "manual", "awaiting your click");
+    logLine("scribe", "ERROR " + e.message, "error");
+  }
+}
+
+async function sendLead(id, index) {
+  const c = cards[index]; if (!c) return;
+  setCardStatus(index, "sending", "Postie is delivering…");
+  setNode("outreach", "running", "sending…");
+  logLine("postie", `Sending → ${c.lead.email || id}`, "postie");
+  try {
+    const r = await fetch("/api/send/" + id, { method: "POST" });
+    const data = await r.json();
+    if (!data.success) throw new Error(data.error || "send failed");
+    setCardStatus(index, "contacted", `✓ sent (${data.mode || "?"})`);
+    summary.drafted = Math.max(0, summary.drafted - 1);
+    summary.sent += 1; refreshSummary();
+    setNode("outreach", "manual", "awaiting your click");
+    logLine("postie", `Delivered (${data.mode})`, "success");
+  } catch (e) {
+    setCardStatus(index, "error", "send failed: " + e.message);
+    summary.errors += 1; refreshSummary();
+    setNode("outreach", "manual", "awaiting your click");
+    logLine("postie", "ERROR " + e.message, "error");
+  }
+}
+
+async function rejectLead(id, index) {
+  const c = cards[index]; if (!c) return;
+  try {
+    await fetch("/api/reject/" + id, { method: "POST" });
+    if (c.status === "qualified") summary.qualified = Math.max(0, summary.qualified - 1);
+    if (c.status === "drafted")   summary.drafted   = Math.max(0, summary.drafted   - 1);
+    if (c.status === "no_contact_email") summary.needsdm = Math.max(0, summary.needsdm - 1);
+    summary.rejected += 1; refreshSummary();
+    setCardStatus(index, "rejected", "✗ rejected");
+    logLine("system", `${c.lead.company || id} rejected`, "system");
+  } catch (e) {
+    logLine("system", "reject failed: " + e.message, "error");
+  }
+}
+
+function toggleEdit(index, on) {
+  const c = cards[index]; if (!c) return;
+  c.editing = !!on;
+  c.el.querySelector(".card-email").classList.toggle("editing", !!on);
+  renderActions(index);
+}
+
+async function saveEdit(id, index) {
+  const c = cards[index]; if (!c) return;
+  const box = c.el.querySelector(".card-email");
+  const subject = box.querySelector(".edit-subj").value.trim();
+  const body = box.querySelector(".edit-body").value.trim();
+  if (!subject || !body) { alert("Subject and body required"); return; }
+  try {
+    const r = await fetch("/api/edit/" + id, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ subject, body }),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || "edit failed");
+    showDraft(index, subject, body);
+    toggleEdit(index, false);
+    logLine("scribe", "Draft edited by you", "system");
+  } catch (e) {
+    logLine("scribe", "edit failed: " + e.message, "error");
+  }
+}
+
+async function bulkDraft() {
+  for (const [idx, c] of Object.entries(cards)) {
+    if (c.status === "qualified") {
+      await draftLead(c.lead.id, +idx);
+    }
+  }
+}
+async function bulkSend() {
+  for (const [idx, c] of Object.entries(cards)) {
+    if (c.status === "drafted") {
+      await sendLead(c.lead.id, +idx);
+    }
+  }
+}
+
+/* ---------------- Search run ---------------- */
+async function runSearch() {
+  const body = {
+    location: $("f-location").value.trim(),
+    niche: $("f-niche").value.trim(),
+    count: Number($("f-count").value) || 5,
+    campaign_id: $("f-campaign").value || null,
+  };
+  if (!body.location || !body.niche) { alert("Location and niche are required"); return; }
+  resetUI();
+  $("go-btn").disabled = true;
+
+  let res;
+  try {
+    const r = await fetch("/api/search", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (!r.ok) throw new Error(await r.text());
+    res = await r.json();
+  } catch (e) {
+    logLine("system", "Failed to start: " + e.message, "error");
+    $("go-btn").disabled = false;
+    return;
+  }
+  logLine("system", `Search started · run ${res.run_id.slice(0,8)}`, "system");
+
+  if (currentSource) currentSource.close();
+  const src = new EventSource(`/api/stream/${res.run_id}`);
+  currentSource = src;
+
+  src.addEventListener("finder_start", e => {
+    const d = JSON.parse(e.data);
+    setNode("finder", "running", "searching…");
+    logLine("finder", `Searching ${d.count} ${d.niche} in ${d.location}`, "finder");
+  });
+  src.addEventListener("finder_progress", e => {
+    const d = JSON.parse(e.data);
+    if (d.step) setNode("finder", "running", d.step.replace(/_/g, " "));
+  });
+  src.addEventListener("finder_complete", e => {
+    const d = JSON.parse(e.data);
+    setNode("finder", "done", `found ${d.count}`);
+    setArrow(1, true);
+    logLine("finder", `Found ${d.count} leads (${d.source})`, "success");
+    summary.found = d.count; refreshSummary();
+    $("lead-grid").innerHTML = "";
+    if (d.count === 0) {
+      $("lead-grid").innerHTML = '<div class="empty-msg">No leads found. Try a different niche or location.</div>';
+      return;
+    }
+    d.leads.forEach((lead, i) => {
+      const card = makeCard(i, lead);
+      cards[i] = { el: card, lead, status: "queued", editing: false };
+      $("lead-grid").appendChild(card);
+    });
+  });
+  src.addEventListener("finder_error", e => {
+    const d = JSON.parse(e.data);
+    setNode("finder", "idle", "error");
+    logLine("finder", d.error, "error");
+  });
+
+  src.addEventListener("lead_start", e => {
+    const d = JSON.parse(e.data);
+    if (d.lead && d.lead.id) cards[d.index] && (cards[d.index].lead.id = d.lead.id);
+    // Phase A finished for this lead → it's now waiting for an enricher
+    // worker to pick it up. Be specific so the user knows it's not stuck.
+    setCardStatus(d.index, "enriching", "awaiting enricher…");
+  });
+
+  /* Tier 2 — enricher events */
+  src.addEventListener("enricher_start", e => {
+    const d = JSON.parse(e.data);
+    setNode("enricher", "running", `lead ${d.index + 1}`);
+    setCardStatus(d.index, "enriching", "checking website…");
+  });
+  src.addEventListener("enricher_complete", e => {
+    const d = JSON.parse(e.data);
+    setNode("enricher", "done", "done");
+    setArrow(2, true);
+    showSignals(d.index, d.signals || {});
+    const cnt = Object.keys(d.signals || {}).filter(k => d.signals[k]).length;
+    logLine("enricher", `Lead ${d.index+1}: ${cnt} signals collected`, "enricher");
+  });
+
+  src.addEventListener("scorer_start", e => {
+    const d = JSON.parse(e.data);
+    setNode("scorer", "running", `lead ${d.index + 1}`);
+    setCardStatus(d.index, "scoring", "scoring…");
+  });
+  src.addEventListener("scorer_complete", e => {
+    const d = JSON.parse(e.data);
+    const c = cards[d.index]; if (!c) return;
+    const sc = c.el.querySelector(".card-score");
+    sc.textContent = `${d.score}/5`;
+    sc.className = `card-score s${d.score}`;
+    c.el.querySelector(".card-reasoning").textContent = d.reasoning || "";
+    if (d.status === "qualified") {
+      setCardStatus(d.index, "qualified", "✓ qualified · ready for Scribe");
+      summary.qualified += 1;
+    } else {
+      setCardStatus(d.index, "rejected", "✗ rejected");
+      summary.rejected += 1;
+    }
+    refreshSummary();
+    setNode("scorer", "done", "done");
+    logLine("scorer", `Lead ${d.index+1}: ${d.score}/5 — ${d.reasoning || ""}`, "scorer");
+  });
+  src.addEventListener("scorer_error", e => {
+    const d = JSON.parse(e.data);
+    setCardStatus(d.index, "error", "scorer error");
+    summary.errors += 1; refreshSummary();
+    logLine("scorer", `Lead ${d.index+1}: ${d.error}`, "error");
+  });
+
+  src.addEventListener("lead_done", e => {
+    const d = JSON.parse(e.data);
+    if (d.status === "no_contact_email") {
+      setCardStatus(d.index, "no_contact_email", "no email · queue for manual DM");
+      summary.needsdm += 1; refreshSummary();
+      logLine("system", `Lead ${d.index+1}: no email`, "system");
+    }
+  });
+  src.addEventListener("lead_skipped", e => {
+    const d = JSON.parse(e.data);
+    // The card was already painted by finder_complete. Update its state
+    // so the user sees what happened — not a frozen "queued" spinner.
+    if (d.reason === "duplicate") {
+      // Dupe is informational, not an error; show a "discard" button.
+      const text = `dupe — already in DB${d.existing_status ? " ("+d.existing_status+")" : ""}`;
+      setCardStatus(d.index, "rejected", text);
+      summary.duplicates = (summary.duplicates || 0) + 1;
+      logLine("system", `Lead ${d.index+1}: duplicate of ${d.domain} — skipped`, "system");
+    } else {
+      // Insert failed (DB constraint, etc) — surface error and add discard.
+      setCardStatus(d.index, "error", "skip: " + (d.error || "insert failed"));
+      summary.errors += 1;
+      logLine("system", `Lead ${d.index+1} skipped: ${d.error || "(no detail)"}`, "error");
+    }
+    refreshSummary();
+    // The card now has a real status; renderActions runs inside setCardStatus
+    // so the user gets the appropriate "Retry draft" / nothing depending on state.
+  });
+
+  src.addEventListener("search_done", e => {
+    const d = JSON.parse(e.data);
+    const s = d.summary;
+    logLine("system", `Search done · qualified=${s.qualified} rejected=${s.rejected} needsDM=${s.needs_dm||0}`, "success");
+  });
+
+  src.addEventListener("end", () => {
+    src.close(); currentSource = null;
+    $("go-btn").disabled = false;
+  });
+  src.onerror = () => {
+    if (src.readyState === EventSource.CLOSED) $("go-btn").disabled = false;
+  };
+}
+
+$("go-btn").addEventListener("click", runSearch);
+$("f-location").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
+$("f-niche").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
+$("bulk-draft").addEventListener("click", bulkDraft);
+$("bulk-send").addEventListener("click", bulkSend);
+
+/* ---------------- B11: campaigns dropdown + modal ---------------- */
+async function loadCampaigns() {
+  try {
+    const r = await fetch("/api/campaigns?active=true");
+    if (!r.ok) return;
+    const list = await r.json();
+    const sel = $("f-campaign");
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">— default rubric —</option>';
+    list.forEach(c => {
+      const opt = document.createElement("option");
+      opt.value = c.id;
+      opt.textContent = c.name + (c.score_threshold !== 3 ? ` (≥${c.score_threshold})` : "");
+      sel.appendChild(opt);
+    });
+    if (cur) sel.value = cur;
+  } catch (e) { /* ignore */ }
+}
+loadCampaigns();
+
+$("campaign-new").addEventListener("click", e => {
+  e.preventDefault();
+  $("cm-name").value = "";
+  $("cm-desc").value = "";
+  $("cm-angle").value = "";
+  $("cm-threshold").value = "3";
+  $("campaign-modal").style.display = "flex";
+  setTimeout(() => $("cm-name").focus(), 50);
+});
+$("cm-cancel").addEventListener("click", () => {
+  $("campaign-modal").style.display = "none";
+});
+$("campaign-modal").addEventListener("click", e => {
+  if (e.target.id === "campaign-modal") $("campaign-modal").style.display = "none";
+});
+$("cm-create").addEventListener("click", async () => {
+  const name = $("cm-name").value.trim();
+  if (!name) { alert("Name is required"); return; }
+  const payload = {
+    name,
+    description: $("cm-desc").value.trim(),
+    pitch_angle: $("cm-angle").value.trim(),
+    score_threshold: Number($("cm-threshold").value) || 3,
+    active: true,
+  };
+  try {
+    const r = await fetch("/api/campaigns", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!r.ok) throw new Error((await r.json()).detail || "create failed");
+    const created = await r.json();
+    $("campaign-modal").style.display = "none";
+    await loadCampaigns();
+    $("f-campaign").value = created.id;
+    logLine("system", `Campaign created: ${created.name}`, "success");
+  } catch (err) {
+    alert("Couldn't create campaign: " + err.message);
+  }
+});
+
+/* ---------------- B12: ops footer ---------------- */
+async function refreshOps() {
+  try {
+    const r = await fetch("/api/stats");
+    if (!r.ok) return;
+    const d = await r.json();
+    const o = d.openai || {};
+    $("ops-spend").textContent = "$" + (o.usd || 0).toFixed(4);
+    $("ops-cap").textContent = o.cap_usd ? `(cap $${(+o.cap_usd).toFixed(2)})` : "(no cap)";
+    const L = d.leads || {};
+    $("ops-leads-total").textContent = L.total || 0;
+    const byStatus = L.by_status || {};
+    const order = ["qualified","drafted","contacted","rejected","no_contact_email","new","error"];
+    const fmt = (k, color) => byStatus[k] ? `<span style="color:${color}">${k}=${byStatus[k]}</span>` : "";
+    $("ops-leads-status").innerHTML = [
+      fmt("qualified", "var(--good)"),
+      fmt("drafted",   "var(--purple)"),
+      fmt("contacted", "var(--accent)"),
+      fmt("rejected",  "var(--bad)"),
+      fmt("no_contact_email", "var(--warn)"),
+      fmt("error", "var(--warn)"),
+    ].filter(Boolean).join(" · ");
+    const bySource = L.by_source || {};
+    $("ops-leads-source").innerHTML = "src: " +
+      Object.entries(bySource).map(([k,v]) => `<span style="color:var(--text)">${k}=${v}</span>`).join(" · ");
+    const c = d.cache || {};
+    $("ops-cache").textContent = c.enabled
+      ? `${c.rows||0} rows · ${c.fresh_rows||0} fresh · ttl ${c.ttl_hours||24}h`
+      : "disabled";
+  } catch (e) { /* ignore — footer is informational */ }
+}
+refreshOps();
+setInterval(refreshOps, 15000);
+
+// Pre-fill the first preset
+document.querySelector(".preset").click();
+</script>
+</body>
+</html>
