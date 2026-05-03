@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import csv
+import io
 import json
 import os
 import secrets
@@ -94,6 +96,32 @@ def dashboard() -> HTMLResponse:
 @app.get("/api/health")
 def health() -> dict[str, str]:
     return {"status": "running"}
+
+
+@app.get("/api/leads/export", dependencies=[Depends(require_api_key)])
+def export_leads(status: Optional[str] = None):
+    """Download all leads (or a filtered subset) as a CSV file.
+
+    Query param ``status`` filters by lead status, e.g.
+    ``/api/leads/export?status=qualified``
+    """
+    rows = get_all_leads(status=status)
+    cols = ["id", "company", "name", "email", "website", "phone",
+            "instagram", "facebook", "industry", "score", "status",
+            "source", "created_at"]
+
+    buf = io.StringIO()
+    writer = csv.DictWriter(buf, fieldnames=cols, extrasaction="ignore", lineterminator="\r\n")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow({c: (row.get(c) or "") for c in cols})
+
+    filename = f"leads{'_' + status if status else ''}.csv"
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/leads")

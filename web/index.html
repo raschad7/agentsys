@@ -202,6 +202,7 @@
   }
   .bulk-btn:hover { border-color: var(--purple); background: rgba(192,132,252,0.08); }
   .bulk-btn.send:hover { border-color: var(--accent); background: rgba(94,234,212,0.08); }
+  .bulk-btn.export:hover { border-color: #60a5fa; background: rgba(96,165,250,0.08); }
 
   /* Main: grid + log */
   main {
@@ -502,6 +503,8 @@
   <span class="label">Bulk actions</span>
   <button class="bulk-btn" id="bulk-draft">✍ Draft all qualified</button>
   <button class="bulk-btn send" id="bulk-send">📮 Send all drafts</button>
+  <button class="bulk-btn export" id="bulk-export-all" title="Download all leads as CSV">⬇ Export all</button>
+  <button class="bulk-btn export" id="bulk-export-qualified" title="Download qualified leads only">⬇ Qualified CSV</button>
 </div>
 
 <main>
@@ -1033,6 +1036,32 @@ $("f-location").addEventListener("keydown", e => { if (e.key === "Enter") runSea
 $("f-niche").addEventListener("keydown", e => { if (e.key === "Enter") runSearch(); });
 $("bulk-draft").addEventListener("click", bulkDraft);
 $("bulk-send").addEventListener("click", bulkSend);
+
+function exportLeads(status) {
+  const url = "/api/leads/export" + (status ? "?status=" + status : "");
+  const a = document.createElement("a");
+  a.href = url;
+  a.setAttribute("download", "");
+  // Must pass the API key — use a fetch-then-blob approach
+  fetch(url, { headers: { "X-API-Key": API_KEY } })
+    .then(r => {
+      const disp = r.headers.get("Content-Disposition") || "";
+      const match = disp.match(/filename="([^"]+)"/);
+      const filename = match ? match[1] : (status ? "leads_" + status + ".csv" : "leads.csv");
+      return r.blob().then(blob => ({ blob, filename }));
+    })
+    .then(({ blob, filename }) => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    })
+    .catch(e => alert("Export failed: " + e.message));
+}
+$("bulk-export-all").addEventListener("click", () => exportLeads(null));
+$("bulk-export-qualified").addEventListener("click", () => exportLeads("qualified"));
 
 /* ---------------- B11: campaigns dropdown + modal ---------------- */
 async function loadCampaigns() {
