@@ -26,10 +26,12 @@ from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, StreamingResponse
 from pydantic import BaseModel
 
+from agents.dm_agent import draft_opener as dm_draft_opener, draft_reply as dm_draft_reply
 from agents.outreach import draft_email_for_lead, send_existing_draft
 from graph.pipeline import run_pipeline
 from graph.search_pipeline import run_search
 from tools import campaigns as campaigns_tool
+from tools import conversations as conv_tool
 from tools import enrichment_cache, events, llm
 from tools.supabase_client import (
     find_outreach_by_email,
@@ -406,6 +408,176 @@ def api_reject(lead_id: str) -> dict[str, Any]:
     return {"lead_id": lead_id, "status": "rejected"}
 
 
+# ---- DM conversations (WhatsApp / Instagram / Facebook) ------------------ #
+#
+# Cold-DMing through WhatsApp Business / Instagram Messenger APIs is
+# blocked by Meta's policies. We work around that with click-to-DM links:
+# the dashboard generates a wa.me / ig.me URL with a personalized opener
+# pre-filled, the user clicks Send manually in the app, then comes back
+# and pastes the reply. The dm_agent handles the conversational drafting.
+
+
+def _conv_payload(conv: dict, lead: dict) -> dict:
+    """Bundle conv + the helper links the dashboard needs to render it."""
+    channel = conv.get("channel", "")
+    last_us = next(
+        (t["message"] for t in reversed(conv.get("turns") or []) if t.get("role") == "us"),
+        "",
+    )
+    # The link is pre-filled with the most recent OUR message so the user
+    # can click straight to the app and send it without copy-pasting.
+    if channel == "whatsapp":
+        link = conv_tool.whatsapp_link(lead.get("phone", ""), last_us)
+    elif channel == "instagram":
+        link = conv_tool.instagram_link(lead.get("instagram", ""), last_us)
+    elif channel == "facebook":
+        link = conv_tool.facebook_link(lead.get("facebook", ""))
+    else:
+        link = ""
+    return {
+        "id": conv.get("id"),
+        "lead_id": conv.get("lead_id"),
+        "channel": channel,
+        "status": conv.get("status"),
+        "turns": conv.get("turns") or [],
+        "link": link,
+        "updated_at": conv.get("updated_at"),
+    }
+
+
+class DMDraftBody(BaseModel):
+    channel: str  # whatsapp | instagram | facebook
+
+
+class DMTurnBody(BaseModel):
+    channel: str
+    role: str  # us | them
+    message: str
+
+
+@app.get("/api/conversation/{lead_id}", dependencies=[Depends(require_api_key)])
+def api_conversation_list(lead_id: str) -> dict[str, Any]:
+    """List all DM conversations for a lead (one per channel)."""
+    lead = get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="lead not found")
+    convs = conv_tool.list_for_lead(lead_id)
+    return {
+        "lead": {
+            "id": lead.get("id"),
+            "company": lead.get("company"),
+            "phone": lead.get("phone"),
+            "instagram": lead.get("instagram"),
+            "facebook": lead.get("facebook"),
+        },
+        "conversations": [_conv_payload(c, lead) for c in convs],
+    }
+
+
+@app.post("/api/conversation/{lead_id}/draft", dependencies=[Depends(require_api_key)])
+def api_conversation_draft(lead_id: str, body: DMDraftBody) -> dict[str, Any]:
+    """Draft the next DM message.
+
+    If the conversation has no turns yet → draft an opener.
+    Otherwise → draft a reply based on full history (and the most recent
+    'them' message if present).
+
+    The drafted message is NOT auto-appended; the user reviews it, sends
+    it manually in WhatsApp/IG, then comes back and POSTs to /turn with
+    role='us' to log that it went out. This keeps the log honest.
+    """
+    lead = get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="lead not found")
+    if body.channel not in conv_tool.CHANNELS:
+        raise HTTPException(status_code=400, detail=f"channel must be one of {conv_tool.CHANNELS}")
+
+    conv = conv_tool.get_or_create(lead_id, body.channel)
+    turns = conv.get("turns") or []
+
+    if not turns:
+        result = dm_draft_opener(lead, body.channel)
+        if result.get("error"):
+            raise HTTPException(status_code=500, detail=result["error"])
+        return {
+            "lead_id": lead_id,
+            "channel": body.channel,
+            "type": "opener",
+            "message": result["message"],
+            "intent": "opener",
+        }
+
+    # Find their last message to highlight it for the model.
+    last_them = next(
+        (t["message"] for t in reversed(turns) if t.get("role") == "them"),
+        None,
+    )
+    result = dm_draft_reply(lead, body.channel, turns, last_them)
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=result["error"])
+    return {
+        "lead_id": lead_id,
+        "channel": body.channel,
+        "type": "reply",
+        "message": result["message"],
+        "intent": result.get("intent", "continue"),
+    }
+
+
+@app.post("/api/conversation/{lead_id}/turn", dependencies=[Depends(require_api_key)])
+def api_conversation_turn(lead_id: str, body: DMTurnBody) -> dict[str, Any]:
+    """Log a turn (either 'us' that we just sent, or 'them' that came back).
+
+    Side effects:
+      - first 'us' turn flips lead status from 'no_contact_email' to 'dming'
+      - logging a 'them' turn keeps lead status as 'dming' (or sets it back
+        from 'no_response' if we'd given up on them earlier)
+    """
+    lead = get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="lead not found")
+    if body.channel not in conv_tool.CHANNELS:
+        raise HTTPException(status_code=400, detail=f"channel must be one of {conv_tool.CHANNELS}")
+    if body.role not in ("us", "them"):
+        raise HTTPException(status_code=400, detail="role must be 'us' or 'them'")
+    msg = (body.message or "").strip()
+    if not msg:
+        raise HTTPException(status_code=400, detail="message is empty")
+
+    conv = conv_tool.get_or_create(lead_id, body.channel)
+    conv = conv_tool.append_turn(conv["id"], body.role, msg)
+
+    cur_status = lead.get("status")
+    if cur_status in ("no_contact_email", "no_response", "dming"):
+        update_lead(lead_id, {"status": "dming"})
+
+    return {
+        "lead_id": lead_id,
+        "conversation": _conv_payload(conv, lead),
+    }
+
+
+class DMStatusBody(BaseModel):
+    channel: str
+    status: str  # open | closed | booked | no_response
+
+
+@app.post("/api/conversation/{lead_id}/status", dependencies=[Depends(require_api_key)])
+def api_conversation_status(lead_id: str, body: DMStatusBody) -> dict[str, Any]:
+    """Update conversation status (booked / closed / no_response)."""
+    lead = get_lead(lead_id)
+    if not lead:
+        raise HTTPException(status_code=404, detail="lead not found")
+    conv = conv_tool.get_or_create(lead_id, body.channel)
+    conv = conv_tool.update_status(conv["id"], body.status) or conv
+    # Mirror booked/closed back onto the lead so the dashboard counters reflect it.
+    if body.status == "booked":
+        update_lead(lead_id, {"status": "contacted"})
+    elif body.status == "closed":
+        update_lead(lead_id, {"status": "rejected"})
+    return {"lead_id": lead_id, "conversation": _conv_payload(conv, lead)}
+
+
 @app.get("/api/lead/{lead_id}", dependencies=[Depends(require_api_key)])
 def api_get_lead(lead_id: str) -> dict[str, Any]:
     """Fetch full lead state including the latest draft (for dashboard refresh)."""
@@ -413,6 +585,7 @@ def api_get_lead(lead_id: str) -> dict[str, Any]:
     if not lead:
         raise HTTPException(status_code=404, detail="lead not found")
     out = get_latest_outreach_for_lead(lead_id)
+    convs = conv_tool.list_for_lead(lead_id)
     return {
         "lead": lead,
         "draft": {
@@ -421,6 +594,7 @@ def api_get_lead(lead_id: str) -> dict[str, Any]:
             "status": (out or {}).get("status", ""),
             "sent_at": (out or {}).get("sent_at"),
         } if out else None,
+        "conversations": [_conv_payload(c, lead) for c in convs],
     }
 
 

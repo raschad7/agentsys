@@ -204,6 +204,58 @@
   .bulk-btn.send:hover { border-color: var(--accent); background: rgba(94,234,212,0.08); }
   .bulk-btn.export:hover { border-color: #60a5fa; background: rgba(96,165,250,0.08); }
 
+  /* ---- DM modal ---- */
+  .dm-tab {
+    background: var(--panel-2); border: 1px solid var(--border);
+    color: var(--muted); padding: 5px 12px; border-radius: 8px;
+    font-size: 12px; cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+  }
+  .dm-tab:hover { color: var(--text); }
+  .dm-tab.active {
+    border-color: var(--accent); color: var(--text);
+    background: rgba(94,234,212,0.08);
+  }
+  .dm-tab.disabled { opacity: 0.35; cursor: not-allowed; }
+  .dm-bubble {
+    max-width: 78%; padding: 6px 10px; border-radius: 10px;
+    word-break: break-word; line-height: 1.4;
+  }
+  .dm-bubble.us {
+    align-self: flex-end;
+    background: rgba(94,234,212,0.12);
+    border: 1px solid rgba(94,234,212,0.28);
+    color: var(--text);
+  }
+  .dm-bubble.them {
+    align-self: flex-start;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  .dm-bubble .dm-ts {
+    font-size: 9px; color: var(--muted); margin-top: 3px;
+  }
+  .dm-empty {
+    color: var(--muted); font-size: 11px; text-align:center; padding: 14px 0;
+  }
+  .dm-link-btn {
+    background: rgba(34,197,94,0.10); border: 1px solid rgba(34,197,94,0.4);
+    color: #4ade80; padding: 6px 10px; border-radius: 8px;
+    font-size: 12px; cursor: pointer; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .dm-link-btn:hover { background: rgba(34,197,94,0.18); }
+  .dm-link-btn.ig { background: rgba(232,62,140,0.10); border-color: rgba(232,62,140,0.4); color: #f472b6; }
+  .dm-link-btn.ig:hover { background: rgba(232,62,140,0.18); }
+  .dm-link-btn.fb { background: rgba(59,130,246,0.10); border-color: rgba(59,130,246,0.4); color: #60a5fa; }
+  .dm-link-btn.fb:hover { background: rgba(59,130,246,0.18); }
+
+  .act-btn.dm {
+    background: rgba(34,197,94,0.10); border-color: rgba(34,197,94,0.4); color: #4ade80;
+  }
+  .act-btn.dm:hover { background: rgba(34,197,94,0.20); }
+
   /* Main: grid + log */
   main {
     display: grid;
@@ -417,6 +469,63 @@
     </select>
   </div>
   <button id="go-btn" class="go-btn">Go</button>
+</div>
+
+<!-- DM conversation modal -->
+<div id="dm-modal" style="
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,0.7);
+  z-index:1001; align-items:center; justify-content:center;">
+  <div style="
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px;
+    padding: 22px; width: min(640px, 94vw); max-height: 88vh; overflow-y:auto;
+    display:flex; flex-direction:column; gap: 12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <h3 id="dm-title" style="margin:0; font-size:14px; color:var(--text);">DM conversation</h3>
+      <button id="dm-close" class="bulk-btn" style="padding:4px 10px;">✕</button>
+    </div>
+
+    <!-- Channel tabs -->
+    <div id="dm-channels" style="display:flex; gap:6px; flex-wrap:wrap;"></div>
+
+    <!-- Conversation transcript (chat-style) -->
+    <div id="dm-thread" style="
+      background:var(--panel-2); border:1px solid var(--border); border-radius:8px;
+      padding:10px; min-height:120px; max-height:260px; overflow-y:auto;
+      display:flex; flex-direction:column; gap:6px; font-size:12px;"></div>
+
+    <!-- Outgoing draft area -->
+    <div class="field">
+      <label style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Outgoing message</span>
+        <button id="dm-draft-btn" class="bulk-btn" style="padding:3px 8px; font-size:11px;">⚡ Draft with AI</button>
+      </label>
+      <textarea id="dm-outgoing" rows="3" placeholder="What do you want to send? Or click ⚡ Draft."
+        style="background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+               padding:8px; border-radius:8px; font-size:13px; outline:none;
+               font-family:inherit; resize:vertical;"></textarea>
+      <div id="dm-link-row" style="display:flex; gap:6px; margin-top:6px; flex-wrap:wrap;"></div>
+    </div>
+
+    <!-- Reply logger -->
+    <div class="field">
+      <label>Their reply (paste here when they message back)</label>
+      <textarea id="dm-incoming" rows="2" placeholder="Paste their reply, then click Log reply."
+        style="background:var(--panel-2); border:1px solid var(--border); color:var(--text);
+               padding:8px; border-radius:8px; font-size:13px; outline:none;
+               font-family:inherit; resize:vertical;"></textarea>
+      <div style="display:flex; gap:6px; margin-top:6px;">
+        <button id="dm-log-reply" class="bulk-btn" style="padding:5px 10px;">📥 Log reply</button>
+      </div>
+    </div>
+
+    <!-- Status controls -->
+    <div style="border-top:1px solid var(--border); padding-top:10px;
+                display:flex; gap:6px; justify-content:flex-end; flex-wrap:wrap;">
+      <button id="dm-status-booked" class="bulk-btn send" style="padding:5px 10px;">✓ Booked</button>
+      <button id="dm-status-noresp" class="bulk-btn" style="padding:5px 10px;">⏸ No response</button>
+      <button id="dm-status-closed" class="bulk-btn" style="padding:5px 10px;">✗ Closed</button>
+    </div>
+  </div>
 </div>
 
 <!-- B11 — campaign create modal -->
@@ -696,7 +805,7 @@ function setCardStatus(index, klass, text) {
   const c = cards[index]; if (!c) return;
   c.el.className = "card " + klass;
   if (text !== undefined) c.el.querySelector(".status-text").textContent = text;
-  const terminal = ["qualified","drafted","contacted","rejected","error","no_contact_email"];
+  const terminal = ["qualified","drafted","contacted","rejected","error","no_contact_email","dming"];
   const spin = c.el.querySelector(".spin");
   if (spin) spin.style.display = terminal.includes(klass) ? "none" : "inline-block";
   c.status = klass;
@@ -726,9 +835,18 @@ function renderActions(index) {
   } else if (status === "rejected") {
     html += `<span style="font-size:11px;color:var(--bad)">✗ rejected</span>`;
     html += `<button class="act-btn edit" onclick="dismissCard(${index})">⨯ Hide</button>`;
-  } else if (status === "no_contact_email") {
-    if (id) html += `<button class="act-btn reject" onclick="rejectLead('${id}',${index})">✗ Discard</button>`;
-    else    html += `<button class="act-btn edit"   onclick="dismissCard(${index})">⨯ Dismiss</button>`;
+  } else if (status === "no_contact_email" || status === "dming") {
+    if (id) {
+      // Channel buttons depend on what contact info we have. We open a
+      // unified DM panel and let the user pick the channel inside it.
+      const has = c.lead.phone || c.lead.instagram || c.lead.facebook;
+      if (has) {
+        html += `<button class="act-btn dm" onclick="openDM('${id}',${index})">💬 DM</button>`;
+      }
+      html += `<button class="act-btn reject" onclick="rejectLead('${id}',${index})">✗ Discard</button>`;
+    } else {
+      html += `<button class="act-btn edit"   onclick="dismissCard(${index})">⨯ Dismiss</button>`;
+    }
   } else if (status === "error") {
     // No lead_id = insert never succeeded → only client-side dismiss.
     if (id) {
@@ -1062,6 +1180,258 @@ function exportLeads(status) {
 }
 $("bulk-export-all").addEventListener("click", () => exportLeads(null));
 $("bulk-export-qualified").addEventListener("click", () => exportLeads("qualified"));
+
+/* ---------------- DM conversation modal ---------------- */
+let dmState = {
+  leadId: null,
+  leadIndex: null,
+  lead: null,         // {phone, instagram, facebook, company}
+  channel: null,      // currently selected channel
+  conversations: {},  // channel -> conv payload
+};
+
+const DM_CHANNEL_META = {
+  whatsapp:  { label: "💬 WhatsApp", linkClass: "wa", linkLabel: "Open in WhatsApp", field: "phone" },
+  instagram: { label: "📷 Instagram", linkClass: "ig", linkLabel: "Open in Instagram", field: "instagram" },
+  facebook:  { label: "📘 Facebook", linkClass: "fb", linkLabel: "Open Facebook page", field: "facebook" },
+};
+
+function openDM(leadId, index) {
+  const c = cards[index];
+  dmState.leadId = leadId;
+  dmState.leadIndex = index;
+  dmState.lead = c ? c.lead : null;
+  dmState.channel = null;
+  dmState.conversations = {};
+
+  $("dm-title").textContent = "DM " + (c?.lead?.company || "lead");
+  $("dm-outgoing").value = "";
+  $("dm-incoming").value = "";
+  $("dm-thread").innerHTML = '<div class="dm-empty">Pick a channel above to start.</div>';
+  $("dm-link-row").innerHTML = "";
+  $("dm-modal").style.display = "flex";
+
+  // Load any existing conversations for this lead.
+  fetch("/api/conversation/" + leadId, { headers: { "X-API-Key": API_KEY } })
+    .then(r => r.json())
+    .then(d => {
+      // Index conversations by channel for quick lookup.
+      (d.conversations || []).forEach(cv => { dmState.conversations[cv.channel] = cv; });
+      renderDMChannels(d.lead);
+      // Auto-select the first channel that has either a contact or an existing conv.
+      const first = pickFirstChannel(d.lead);
+      if (first) selectDMChannel(first);
+    })
+    .catch(e => {
+      $("dm-thread").innerHTML = '<div class="dm-empty">Failed to load: ' + e.message + '</div>';
+    });
+}
+
+function pickFirstChannel(lead) {
+  // Prefer a channel that already has history; else the first available contact.
+  for (const ch of ["whatsapp","instagram","facebook"]) {
+    if (dmState.conversations[ch]) return ch;
+  }
+  if (lead.phone)     return "whatsapp";
+  if (lead.instagram) return "instagram";
+  if (lead.facebook)  return "facebook";
+  return null;
+}
+
+function renderDMChannels(lead) {
+  const row = $("dm-channels");
+  let html = "";
+  for (const ch of ["whatsapp","instagram","facebook"]) {
+    const meta = DM_CHANNEL_META[ch];
+    const has = !!(lead[meta.field]);
+    const cls = "dm-tab" + (has ? "" : " disabled");
+    const click = has ? `onclick="selectDMChannel('${ch}')"` : "";
+    html += `<button class="${cls}" data-ch="${ch}" ${click}>${meta.label}</button>`;
+  }
+  row.innerHTML = html;
+}
+
+function selectDMChannel(channel) {
+  dmState.channel = channel;
+  // Repaint tabs to show active.
+  Array.from(document.querySelectorAll("#dm-channels .dm-tab")).forEach(t => {
+    t.classList.toggle("active", t.dataset.ch === channel);
+  });
+  // Fetch fresh conv data for this channel (in case turns were added since open).
+  fetch("/api/conversation/" + dmState.leadId, { headers: { "X-API-Key": API_KEY } })
+    .then(r => r.json())
+    .then(d => {
+      dmState.conversations = {};
+      (d.conversations || []).forEach(cv => { dmState.conversations[cv.channel] = cv; });
+      renderDMThread();
+      renderDMLinks();
+    });
+}
+
+function renderDMThread() {
+  const conv = dmState.conversations[dmState.channel];
+  const thread = $("dm-thread");
+  if (!conv || !(conv.turns || []).length) {
+    thread.innerHTML = '<div class="dm-empty">No messages yet — draft one below to open the conversation.</div>';
+    return;
+  }
+  let html = "";
+  for (const t of conv.turns) {
+    const cls = t.role === "us" ? "us" : "them";
+    const ts = t.ts ? new Date(t.ts).toLocaleString() : "";
+    const safe = (t.message || "").replace(/[<>&]/g, ch => ({"<":"&lt;",">":"&gt;","&":"&amp;"})[ch]);
+    html += `<div class="dm-bubble ${cls}">${safe}<div class="dm-ts">${ts}</div></div>`;
+  }
+  thread.innerHTML = html;
+  thread.scrollTop = thread.scrollHeight;
+}
+
+function renderDMLinks() {
+  const row = $("dm-link-row");
+  const ch = dmState.channel;
+  const meta = DM_CHANNEL_META[ch];
+  if (!meta) { row.innerHTML = ""; return; }
+  // Build a fresh link from the CURRENT outgoing textarea so the user can
+  // edit before clicking. We rebuild on every keystroke too.
+  const text = $("dm-outgoing").value.trim();
+  const lead = dmState.lead;
+  let url = "";
+  if (ch === "whatsapp" && lead.phone) {
+    const digits = (lead.phone || "").replace(/\D/g, "");
+    url = "https://wa.me/" + digits + (text ? "?text=" + encodeURIComponent(text) : "");
+  } else if (ch === "instagram" && lead.instagram) {
+    const u = (lead.instagram || "").replace(/^@/, "");
+    url = "https://ig.me/m/" + u + (text ? "?text=" + encodeURIComponent(text) : "");
+  } else if (ch === "facebook" && lead.facebook) {
+    url = lead.facebook;
+  }
+  if (!url) { row.innerHTML = ""; return; }
+  // The single button: opens the channel AND auto-logs the message as 'us'.
+  const sendDisabled = !text ? "disabled" : "";
+  row.innerHTML = `
+    <a class="dm-link-btn ${meta.linkClass}" href="${url}" target="_blank"
+       onclick="onDMLinkClick(event)">${meta.linkLabel}</a>
+    <button class="bulk-btn" ${sendDisabled} onclick="logOutgoingOnly()">📝 Log as sent (without opening)</button>
+  `;
+}
+
+// User clicked "Open in WhatsApp/IG/FB" — open the link, then log the
+// outgoing message so the thread reflects what was sent.
+function onDMLinkClick(e) {
+  const text = $("dm-outgoing").value.trim();
+  if (!text) return;  // nothing to log; just let the link open
+  // Don't preventDefault — we want the link to open in a new tab too.
+  logOutgoing(text);
+}
+
+function logOutgoingOnly() {
+  const text = $("dm-outgoing").value.trim();
+  if (!text) return;
+  logOutgoing(text);
+}
+
+async function logOutgoing(text) {
+  if (!dmState.leadId || !dmState.channel) return;
+  try {
+    const r = await fetch("/api/conversation/" + dmState.leadId + "/turn", {
+      method: "POST",
+      headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: dmState.channel, role: "us", message: text }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "log failed");
+    dmState.conversations[dmState.channel] = d.conversation;
+    $("dm-outgoing").value = "";
+    renderDMThread();
+    renderDMLinks();
+    // Reflect the new lead status (no_contact_email -> dming) on the card.
+    const c = cards[dmState.leadIndex];
+    if (c) setCardStatus(dmState.leadIndex, "dming", "💬 in DM convo");
+  } catch (e) {
+    alert("Could not log: " + e.message);
+  }
+}
+
+async function logIncomingReply() {
+  const text = $("dm-incoming").value.trim();
+  if (!text || !dmState.leadId || !dmState.channel) return;
+  try {
+    const r = await fetch("/api/conversation/" + dmState.leadId + "/turn", {
+      method: "POST",
+      headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: dmState.channel, role: "them", message: text }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "log failed");
+    dmState.conversations[dmState.channel] = d.conversation;
+    $("dm-incoming").value = "";
+    renderDMThread();
+  } catch (e) {
+    alert("Could not log reply: " + e.message);
+  }
+}
+
+async function draftDMMessage() {
+  if (!dmState.leadId || !dmState.channel) {
+    alert("Pick a channel first.");
+    return;
+  }
+  const btn = $("dm-draft-btn");
+  const orig = btn.textContent;
+  btn.textContent = "drafting…";
+  btn.disabled = true;
+  try {
+    const r = await fetch("/api/conversation/" + dmState.leadId + "/draft", {
+      method: "POST",
+      headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: dmState.channel }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "draft failed");
+    $("dm-outgoing").value = d.message;
+    renderDMLinks();
+  } catch (e) {
+    alert("Draft failed: " + e.message);
+  } finally {
+    btn.textContent = orig;
+    btn.disabled = false;
+  }
+}
+
+async function setDMStatus(status) {
+  if (!dmState.leadId || !dmState.channel) return;
+  try {
+    const r = await fetch("/api/conversation/" + dmState.leadId + "/status", {
+      method: "POST",
+      headers: { "X-API-Key": API_KEY, "Content-Type": "application/json" },
+      body: JSON.stringify({ channel: dmState.channel, status }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || "status failed");
+    dmState.conversations[dmState.channel] = d.conversation;
+    // Reflect on the card too.
+    const c = cards[dmState.leadIndex];
+    if (c) {
+      if (status === "booked") setCardStatus(dmState.leadIndex, "contacted", "✓ booked from DM");
+      else if (status === "closed") setCardStatus(dmState.leadIndex, "rejected", "✗ closed");
+      else if (status === "no_response") setCardStatus(dmState.leadIndex, "no_contact_email", "⏸ no reply");
+    }
+    $("dm-modal").style.display = "none";
+  } catch (e) {
+    alert("Status failed: " + e.message);
+  }
+}
+
+$("dm-close").addEventListener("click", () => $("dm-modal").style.display = "none");
+$("dm-modal").addEventListener("click", e => {
+  if (e.target.id === "dm-modal") $("dm-modal").style.display = "none";
+});
+$("dm-draft-btn").addEventListener("click", draftDMMessage);
+$("dm-log-reply").addEventListener("click", logIncomingReply);
+$("dm-outgoing").addEventListener("input", renderDMLinks);
+$("dm-status-booked").addEventListener("click", () => setDMStatus("booked"));
+$("dm-status-noresp").addEventListener("click", () => setDMStatus("no_response"));
+$("dm-status-closed").addEventListener("click", () => setDMStatus("closed"));
 
 /* ---------------- B11: campaigns dropdown + modal ---------------- */
 async function loadCampaigns() {
